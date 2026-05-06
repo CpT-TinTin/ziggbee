@@ -2,6 +2,9 @@ import streamlit as st
 import random
 from datetime import datetime
 
+MAX_PACKETS = 50
+_HEX_PAD = "   "  # 3 chars: matches '{b:02X} ' width for hex alignment
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CONFIG + CSS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -691,7 +694,7 @@ def serialize_packet_to_bytes(mac, nwk, aps, zcl, src_int, dst_int, pan_int, nwk
         cmd_id = int(zcl["command_id"], 16) if zcl.get("command_id") else 0x0A
         trans = zcl.get("trans_seq", 0) & 0xFF
         fc = int(zcl["frame_control_flags"], 16) if zcl.get("frame_control_flags") else 0x18
-        pay_bytes = [ord(c) & 0xFF for c in (zcl.get("payload_raw") or "")[:16]]
+        pay_bytes = list((zcl.get("payload_raw") or "").encode("latin-1", errors="replace")[:16])
         zcl_bytes = [fc, trans, cmd_id] + pay_bytes
         zcl_start = aps_end
         buf.extend(zcl_bytes)
@@ -733,7 +736,7 @@ def render_hex_view(byte_list, slices):
             hex_cols += f'<span class="{cls}">{b:02X}</span> '
         # pad to 16
         for _ in range(16 - len(row)):
-            hex_cols += '<span class="hex-b-pad">   </span>'
+            hex_cols += f'<span class="hex-b-pad">{_HEX_PAD}</span>'
         lines.append(f"<div>{offset}{hex_cols}</div>")
 
     legend = (
@@ -827,7 +830,7 @@ def render_packet_list_html(packets, selected_idx):
         pro = c.get("protocol", "?")
         pro_class = f"ws-td-pro-{pro}" if pro in ("ZCL", "NWK", "MAC") else "ws-td-pro-MAC"
         rows_html += (
-            f'<tr class="{sel_class}" onclick="">'
+            f'<tr class="{sel_class}">'
             f'<td class="ws-td-no">{i+1}</td>'
             f'<td class="ws-td-ts">{c.get("time","")}</td>'
             f'<td class="ws-td-src">{c.get("src","")}</td>'
@@ -848,7 +851,7 @@ def add_pkt(src, dst, cmd, pay=""):
     """Build a structured packet and insert it into the session packets list."""
     pkt = build_packet(cmd, src, dst, pay)
     st.session_state.packets.insert(0, pkt)
-    if len(st.session_state.packets) > 50:
+    if len(st.session_state.packets) > MAX_PACKETS:
         st.session_state.packets.pop()
 
 
